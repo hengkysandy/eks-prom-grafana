@@ -1,10 +1,11 @@
 # E-Commerce Microservices PoC on AWS EKS Fargate
 
-Complete proof-of-concept for deploying a 3-microservice e-commerce application to AWS EKS using Fargate Spot, with full observability stack.
+Complete proof-of-concept for deploying a 3-microservice e-commerce application to AWS EKS using Fargate Spot, with full observability stack using Amazon Managed Prometheus (AMP).
 
 ## 🚀 Quick Links
 
 - **[Getting Started from Scratch](GETTING_STARTED.md)** - Complete step-by-step guide with explanations
+- **[AMP Setup Guide](AMP_SETUP_GUIDE.md)** - Step-by-step AMP integration guide
 - **[Deployment Summary](DEPLOYMENT_SUMMARY.md)** - Current state and what's deployed
 - **[Quick Reference](QUICK_REFERENCE.md)** - Common commands and queries
 - **[Changes Log](CHANGES.md)** - Recent updates and modifications
@@ -14,7 +15,13 @@ Complete proof-of-concept for deploying a 3-microservice e-commerce application 
 **New to this project?** Start here:
 1. Read [GETTING_STARTED.md](GETTING_STARTED.md) - Explains everything from zero
 2. Follow the 7 phases to deploy (~38 minutes)
-3. Use [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for daily operations
+3. Set up AMP: [AMP_SETUP_GUIDE.md](AMP_SETUP_GUIDE.md) - Complete AMP integration
+4. Use [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for daily operations
+
+**Setting up AMP?** Follow this path:
+1. [AMP_SETUP_GUIDE.md](AMP_SETUP_GUIDE.md) - Complete setup instructions
+2. [AMP_VERIFICATION.md](AMP_VERIFICATION.md) - Verify it's working
+3. [GRAFANA_AMP_SETUP.md](GRAFANA_AMP_SETUP.md) - Grafana configuration details
 
 **Already deployed?** Quick access:
 - [DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md) - What's currently running
@@ -26,8 +33,9 @@ Complete proof-of-concept for deploying a 3-microservice e-commerce application 
 - **Region**: ap-southeast-1
 - **Compute**: EKS with Fargate Spot (no EC2 nodes)
 - **Services**: 3 microservices (Node.js, Python, Go)
-- **Monitoring**: In-cluster Prometheus + Grafana + kube-state-metrics
-- **Logging**: Fargate logging → CloudWatch Logs
+- **Metrics**: Prometheus (Helm) → Amazon Managed Prometheus (AMP)
+- **Visualization**: Grafana → AMP (SigV4 authentication)
+- **Logging**: Fargate built-in logging → CloudWatch Logs
 - **Registry**: Amazon ECR
 - **Dashboards**: Custom HTTP metrics + 3 imported Kubernetes dashboards
 
