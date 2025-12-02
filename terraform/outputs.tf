@@ -47,3 +47,29 @@ output "kubeconfig_command" {
   description = "Command to update kubeconfig"
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}"
 }
+
+# Amazon Managed Prometheus Outputs
+output "amp_workspace_id" {
+  description = "Amazon Managed Prometheus Workspace ID"
+  value       = aws_prometheus_workspace.main.id
+}
+
+output "amp_workspace_endpoint" {
+  description = "Amazon Managed Prometheus Workspace Endpoint"
+  value       = aws_prometheus_workspace.main.prometheus_endpoint
+}
+
+output "amp_remote_write_url" {
+  description = "AMP Remote Write URL"
+  value       = "${aws_prometheus_workspace.main.prometheus_endpoint}api/v1/remote_write"
+}
+
+output "amp_ingest_role_arn" {
+  description = "IAM Role ARN for AMP Ingestion"
+  value       = aws_iam_role.amp_ingest.arn
+}
+
+output "amp_query_role_arn" {
+  description = "IAM Role ARN for AMP Query"
+  value       = aws_iam_role.amp_query.arn
+}

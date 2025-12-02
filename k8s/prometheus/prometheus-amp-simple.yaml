@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      external_labels:
+        cluster: ecommerce-poc-eks
+    
+    remote_write:
+      - url: https://aps-workspaces.ap-southeast-1.amazonaws.com/workspaces/ws-0add6a78-6f0f-4adc-8e17-7c05be26eb5b/api/v1/remote_write
+        queue_config:
+          max_samples_per_send: 1000
+          max_shards: 200
+          capacity: 2500
+        sigv4:
+          region: ap-southeast-1
+    
+    scrape_configs:
+      - job_name: 'nodejs-catalog'
+        static_configs:
+          - targets: ['nodejs-catalog.ecommerce-poc.svc.cluster.local:3000']
+      
+      - job_name: 'python-orders'
+        static_configs:
+          - targets: ['python-orders.ecommerce-poc.svc.cluster.local:5000']
+      
+      - job_name: 'go-inventory'
+        static_configs:
+          - targets: ['go-inventory.ecommerce-poc.svc.cluster.local:8080']
+      
+      - job_name: 'kube-state-metrics'
+        static_configs:
+          - targets: ['kube-state-metrics.monitoring.svc.cluster.local:8080']

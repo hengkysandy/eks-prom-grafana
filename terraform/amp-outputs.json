@@ -1,0 +1,88 @@
+{
+  "amp_ingest_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::683031685817:role/ecommerce-poc-amp-ingest-role"
+  },
+  "amp_query_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::683031685817:role/ecommerce-poc-amp-query-role"
+  },
+  "amp_remote_write_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://aps-workspaces.ap-southeast-1.amazonaws.com/workspaces/ws-0add6a78-6f0f-4adc-8e17-7c05be26eb5b/api/v1/remote_write"
+  },
+  "amp_workspace_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://aps-workspaces.ap-southeast-1.amazonaws.com/workspaces/ws-0add6a78-6f0f-4adc-8e17-7c05be26eb5b/"
+  },
+  "amp_workspace_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ws-0add6a78-6f0f-4adc-8e17-7c05be26eb5b"
+  },
+  "cloudwatch_log_group_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "/aws/eks/ecommerce-poc-eks/application"
+  },
+  "cluster_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://47E3D2BFEA53EFEE1603E89266E68C53.gr7.ap-southeast-1.eks.amazonaws.com"
+  },
+  "cluster_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "ecommerce-poc-eks"
+  },
+  "cluster_security_group_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "sg-03e7ab56f5256f344"
+  },
+  "ecr_go_repository_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "683031685817.dkr.ecr.ap-southeast-1.amazonaws.com/ecommerce-go-inventory"
+  },
+  "ecr_nodejs_repository_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "683031685817.dkr.ecr.ap-southeast-1.amazonaws.com/ecommerce-nodejs-catalog"
+  },
+  "ecr_python_repository_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "683031685817.dkr.ecr.ap-southeast-1.amazonaws.com/ecommerce-python-orders"
+  },
+  "kubeconfig_command": {
+    "sensitive": false,
+    "type": "string",
+    "value": "aws eks update-kubeconfig --region ap-southeast-1 --name ecommerce-poc-eks"
+  },
+  "nat_gateway_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "nat-0b5ab58becff23033"
+  },
+  "private_subnet_ids": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-07f071147109234c1",
+      "subnet-01f0244faeade20c1",
+      "subnet-038d71bb8b1e95d42"
+    ]
+  }
+}

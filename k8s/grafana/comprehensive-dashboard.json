@@ -1,0 +1,419 @@
+{
+  "dashboard": {
+    "title": "EKS Cluster - Complete Observability",
+    "tags": ["eks", "kubernetes", "microservices", "comprehensive"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🎯 CLUSTER OVERVIEW",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+        "collapsed": false
+      },
+      {
+        "id": 2,
+        "title": "Cluster Health Score",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 1},
+        "targets": [{"expr": "avg(up) * 100", "refId": "A"}],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 80, "color": "yellow"},
+                {"value": 95, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {"showThresholdLabels": true, "showThresholdMarkers": true}
+      },
+      {
+        "id": 3,
+        "title": "Total Pods by Namespace",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 1},
+        "targets": [{"expr": "count(kube_pod_info) by (namespace)", "legendFormat": "{{namespace}}", "refId": "A"}],
+        "options": {"graphMode": "area", "colorMode": "value"}
+      },
+      {
+        "id": 4,
+        "title": "Pod Status Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 1},
+        "targets": [{"expr": "count(kube_pod_status_phase) by (phase)", "legendFormat": "{{phase}}", "refId": "A"}],
+        "options": {"legend": {"displayMode": "table", "placement": "right"}}
+      },
+      {
+        "id": 5,
+        "title": "Cluster Request Rate (Total)",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 1},
+        "targets": [{"expr": "sum(rate(http_requests_total[1m]))", "refId": "A"}],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "blue"},
+                {"value": 10, "color": "green"},
+                {"value": 50, "color": "yellow"}
+              ]
+            }
+          }
+        },
+        "options": {"graphMode": "area", "colorMode": "value"}
+      },
+      {
+        "id": 10,
+        "title": "📊 NAMESPACE VIEW",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
+        "collapsed": false
+      },
+      {
+        "id": 11,
+        "title": "Pods per Namespace",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+        "targets": [{"expr": "count(kube_pod_info) by (namespace)", "legendFormat": "{{namespace}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 20}}}
+      },
+      {
+        "id": 12,
+        "title": "CPU Requests by Namespace",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+        "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"}) by (namespace)", "legendFormat": "{{namespace}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "short"}}
+      },
+      {
+        "id": 13,
+        "title": "Memory Requests by Namespace",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
+        "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"}) by (namespace)", "legendFormat": "{{namespace}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "bytes"}}
+      },
+      {
+        "id": 14,
+        "title": "Pod Restarts by Namespace",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
+        "targets": [{"expr": "sum(kube_pod_container_status_restarts_total) by (namespace)", "legendFormat": "{{namespace}}", "refId": "A"}]
+      },
+      {
+        "id": 20,
+        "title": "🚀 APPLICATION LAYER - HTTP METRICS",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 26},
+        "collapsed": false
+      },
+      {
+        "id": 21,
+        "title": "Request Rate by Service",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 27},
+        "targets": [{"expr": "sum(rate(http_requests_total[1m])) by (job)", "legendFormat": "{{job}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"fillOpacity": 10}}}
+      },
+      {
+        "id": 22,
+        "title": "Total Requests by Service",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 27},
+        "targets": [{"expr": "sum(http_requests_total) by (job)", "legendFormat": "{{job}}", "refId": "A"}],
+        "options": {"graphMode": "area", "colorMode": "value"}
+      },
+      {
+        "id": 23,
+        "title": "Request Rate by Endpoint (All Services)",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 35},
+        "targets": [
+          {"expr": "sum(rate(http_requests_total[5m])) by (job, route, endpoint, method, status)", "format": "table", "instant": true, "refId": "A"}
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true},
+              "renameByName": {
+                "job": "Service",
+                "route": "Endpoint",
+                "endpoint": "Endpoint",
+                "method": "Method",
+                "status": "Status",
+                "Value": "Req/sec"
+              }
+            }
+          }
+        ],
+        "options": {"sortBy": [{"displayName": "Req/sec", "desc": true}]}
+      },
+      {
+        "id": 30,
+        "title": "📈 PERFORMANCE METRICS",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 45},
+        "collapsed": false
+      },
+      {
+        "id": 31,
+        "title": "Response Time p95 by Service",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 46},
+        "targets": [
+          {"expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, job))", "legendFormat": "{{job}} p95", "refId": "A"}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {"fillOpacity": 10},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.1, "color": "yellow"},
+                {"value": 0.5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 32,
+        "title": "Response Time p50 by Service",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 46},
+        "targets": [
+          {"expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, job))", "legendFormat": "{{job}} p50", "refId": "A"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 10}}}
+      },
+      {
+        "id": 33,
+        "title": "Response Time Heatmap (All Services)",
+        "type": "heatmap",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 54},
+        "targets": [
+          {"expr": "sum(rate(http_request_duration_seconds_bucket[1m])) by (le)", "format": "heatmap", "refId": "A"}
+        ],
+        "options": {"calculate": true, "calculation": {"xBuckets": {"mode": "size", "value": "10s"}}}
+      },
+      {
+        "id": 40,
+        "title": "🔍 POD DETAILS",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 64},
+        "collapsed": false
+      },
+      {
+        "id": 41,
+        "title": "Pod Resource Requests vs Limits",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 65},
+        "targets": [
+          {"expr": "kube_pod_container_resource_requests{resource=\"cpu\"}", "format": "table", "instant": true, "refId": "A"},
+          {"expr": "kube_pod_container_resource_limits{resource=\"cpu\"}", "format": "table", "instant": true, "refId": "B"}
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true, "instance": true, "job": true, "uid": true, "resource": true},
+              "renameByName": {
+                "namespace": "Namespace",
+                "pod": "Pod",
+                "container": "Container",
+                "Value #A": "CPU Request",
+                "Value #B": "CPU Limit"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 42,
+        "title": "Pod Restart Count",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 65},
+        "targets": [
+          {"expr": "kube_pod_container_status_restarts_total", "format": "table", "instant": true, "refId": "A"}
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true, "instance": true, "job": true, "uid": true},
+              "renameByName": {
+                "namespace": "Namespace",
+                "pod": "Pod",
+                "container": "Container",
+                "Value": "Restart Count"
+              }
+            }
+          }
+        ],
+        "options": {"sortBy": [{"displayName": "Restart Count", "desc": true}]}
+      },
+      {
+        "id": 43,
+        "title": "Pod Status by Phase",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 75},
+        "targets": [
+          {"expr": "count(kube_pod_status_phase{namespace=\"ecommerce-poc\"}) by (phase)", "legendFormat": "{{phase}}", "refId": "A"}
+        ],
+        "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 20, "stacking": {"mode": "normal"}}}}
+      },
+      {
+        "id": 50,
+        "title": "🎯 SERVICE HEALTH & AVAILABILITY",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 83},
+        "collapsed": false
+      },
+      {
+        "id": 51,
+        "title": "Service Availability (Uptime %)",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 84},
+        "targets": [
+          {"expr": "avg_over_time(up{job=~\"nodejs-catalog|python-orders|go-inventory\"}[5m]) * 100", "legendFormat": "{{job}}", "refId": "A"}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 95, "color": "yellow"},
+                {"value": 99, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {"colorMode": "background", "graphMode": "area"}
+      },
+      {
+        "id": 52,
+        "title": "HTTP Error Rate by Service",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 90},
+        "targets": [
+          {"expr": "sum(rate(http_requests_total{status=~\"4..|5..\"}[1m])) by (job) / sum(rate(http_requests_total[1m])) by (job) * 100", "legendFormat": "{{job}}", "refId": "A"}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {"fillOpacity": 10},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 53,
+        "title": "Status Code Distribution",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 90},
+        "targets": [
+          {"expr": "sum(rate(http_requests_total[1m])) by (status)", "legendFormat": "{{status}}", "refId": "A"}
+        ],
+        "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 80}}}
+      },
+      {
+        "id": 60,
+        "title": "📋 DEPLOYMENT STATUS",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 98},
+        "collapsed": false
+      },
+      {
+        "id": 61,
+        "title": "Deployment Replica Status",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 99},
+        "targets": [
+          {"expr": "kube_deployment_status_replicas", "format": "table", "instant": true, "refId": "A"},
+          {"expr": "kube_deployment_status_replicas_available", "format": "table", "instant": true, "refId": "B"},
+          {"expr": "kube_deployment_status_replicas_unavailable", "format": "table", "instant": true, "refId": "C"}
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true, "instance": true, "job": true},
+              "renameByName": {
+                "namespace": "Namespace",
+                "deployment": "Deployment",
+                "Value #A": "Desired",
+                "Value #B": "Available",
+                "Value #C": "Unavailable"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 70,
+        "title": "🔥 TOP METRICS",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 107},
+        "collapsed": false
+      },
+      {
+        "id": 71,
+        "title": "Top 10 Endpoints by Request Count",
+        "type": "bargauge",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 108},
+        "targets": [
+          {"expr": "topk(10, sum(http_requests_total) by (job, route, endpoint))", "legendFormat": "{{job}}/{{route}}{{endpoint}}", "refId": "A"}
+        ],
+        "options": {"orientation": "horizontal", "displayMode": "gradient"},
+        "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}}
+      },
+      {
+        "id": 72,
+        "title": "Top 10 Slowest Endpoints (p95)",
+        "type": "bargauge",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 108},
+        "targets": [
+          {"expr": "topk(10, histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job, route, endpoint)))", "legendFormat": "{{job}}/{{route}}{{endpoint}}", "refId": "A"}
+        ],
+        "options": {"orientation": "horizontal", "displayMode": "gradient"},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.1, "color": "yellow"},
+                {"value": 0.5, "color": "red"}
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "overwrite": true
+}
