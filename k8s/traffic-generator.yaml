@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: traffic-generator
+  namespace: ecommerce-poc
+  labels:
+    app: traffic-generator
+spec:
+  containers:
+  - name: alpine
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi

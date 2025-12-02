@@ -1,0 +1,39 @@
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "ap-southeast-1"
+}
+
+variable "aws_account_id" {
+  description = "AWS Account ID"
+  type        = string
+  default     = "683031685817"
+}
+
+variable "vpc_id" {
+  description = "Existing VPC ID"
+  type        = string
+  default     = "vpc-04440292fc58c6a74"
+}
+
+variable "cluster_name" {
+  description = "EKS cluster name"
+  type        = string
+  default     = "ecommerce-poc-eks"
+}
+
+variable "subnet_ids" {
+  description = "Subnet IDs for EKS Fargate"
+  type        = list(string)
+  default     = [
+    "subnet-033dfb4d5f93cfea1",  # ap-southeast-1a
+    "subnet-0a4eba8f84c7b50d2",  # ap-southeast-1b
+    "subnet-0a913be6b8f4e0b9f"   # ap-southeast-1c
+  ]
+}
+
+variable "namespace" {
+  description = "Kubernetes namespace for applications"
+  type        = string
+  default     = "ecommerce-poc"
+}

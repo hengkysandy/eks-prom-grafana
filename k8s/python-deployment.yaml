@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-orders
+  namespace: ecommerce-poc
+  labels:
+    app: python-orders
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: python-orders
+  template:
+    metadata:
+      labels:
+        app: python-orders
+    spec:
+      containers:
+      - name: python-orders
+        image: 683031685817.dkr.ecr.ap-southeast-1.amazonaws.com/ecommerce-python-orders:latest
+        ports:
+        - containerPort: 5000
+          name: http
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: PORT
+          value: "5000"
+        - name: FLASK_ENV
+          value: "production"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-orders
+  namespace: ecommerce-poc
+  labels:
+    app: python-orders
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: python-orders

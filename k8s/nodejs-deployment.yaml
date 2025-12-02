@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-catalog
+  namespace: ecommerce-poc
+  labels:
+    app: nodejs-catalog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodejs-catalog
+  template:
+    metadata:
+      labels:
+        app: nodejs-catalog
+    spec:
+      containers:
+      - name: nodejs-catalog
+        image: 683031685817.dkr.ecr.ap-southeast-1.amazonaws.com/ecommerce-nodejs-catalog:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: PORT
+          value: "3000"
+        - name: NODE_ENV
+          value: "production"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-catalog
+  namespace: ecommerce-poc
+  labels:
+    app: nodejs-catalog
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: nodejs-catalog

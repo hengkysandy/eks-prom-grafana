@@ -1,0 +1,14 @@
+# Copy this file to terraform.tfvars and adjust values if needed
+# Default values are already set in variables.tf
+
+aws_region     = "ap-southeast-1"
+aws_account_id = "683031685817"
+vpc_id         = "vpc-04440292fc58c6a74"
+cluster_name   = "ecommerce-poc-eks"
+namespace      = "ecommerce-poc"
+
+subnet_ids = [
+  "subnet-033dfb4d5f93cfea1",  # ap-southeast-1a
+  "subnet-0a4eba8f84c7b50d2",  # ap-southeast-1b
+  "subnet-0a913be6b8f4e0b9f"   # ap-southeast-1c
+]
