@@ -1,8 +1,8 @@
 # Deployment Summary
 
-## Current State (as of 2025-12-02)
+## Current State (as of 2025-12-05)
 
-This document summarizes the complete deployed infrastructure and applications.
+This document summarizes the complete deployed infrastructure and applications with cloud-agnostic observability stack.
 
 ## Infrastructure (Terraform)
 
@@ -73,7 +73,7 @@ This document summarizes the complete deployed infrastructure and applications.
 - Purpose: Load testing from inside cluster
 - Resources: 50m CPU, 64Mi RAM
 
-### Monitoring Stack (namespace: monitoring)
+### Observability Stack (namespace: monitoring)
 
 **1. Prometheus**
 - Image: prom/prometheus:v2.48.0
@@ -83,20 +83,43 @@ This document summarizes the complete deployed infrastructure and applications.
   - python-orders (port 5000)
   - go-inventory (port 8080)
   - kube-state-metrics (port 8080)
+- Remote Write: Amazon Managed Prometheus (AMP) with SigV4 auth
 - Resources: 250m-500m CPU, 512Mi-1Gi RAM
-- Storage: emptyDir (ephemeral)
+- Storage: emptyDir 8Gi (ephemeral, ~2 hours retention)
 
-**2. kube-state-metrics**
+**2. Loki (Log Aggregation)**
+- Image: grafana/loki:2.9.3
+- Port: 3100
+- Schema: boltdb-shipper
+- Storage: emptyDir (ephemeral)
+- Log Sources:
+  - Node.js: winston-loki direct shipping
+  - Python/Go: CloudWatch Logs (Fargate limitation)
+- Resources: ~0.25 vCPU, 0.5 GB RAM
+
+**3. Tempo (Distributed Tracing)**
+- Image: grafana/tempo:2.3.1
+- Ports: 3200 (HTTP), 4317 (OTLP gRPC), 4318 (OTLP HTTP)
+- Backend: Local storage (emptyDir)
+- Retention: 1 hour
+- Traces Captured: 1,300+ from Node.js service
+- Resources: ~0.25 vCPU, 0.5 GB RAM
+
+**4. kube-state-metrics**
 - Image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.10.1
 - Port: 8080
 - Purpose: Exposes Kubernetes object metrics
 - Resources: 100m-200m CPU, 128Mi-256Mi RAM
 
-**3. Grafana**
+**5. Grafana**
 - Image: grafana/grafana:10.2.0
 - Port: 3000
 - Credentials: admin/admin
-- Datasource: Prometheus (pre-configured)
+- Datasources:
+  - Prometheus (default): In-cluster Prometheus
+  - AMP: Amazon Managed Prometheus (SigV4 auth)
+  - Loki: http://loki:3100
+  - Tempo: http://tempo:3200 (with trace-to-logs correlation)
 - Resources: 200m-400m CPU, 256Mi-512Mi RAM
 - Storage: emptyDir (ephemeral)
 
@@ -104,15 +127,33 @@ This document summarizes the complete deployed infrastructure and applications.
 - Dashboard 3119: Kubernetes Cluster Monitoring via Prometheus
 - Dashboard 8588: Kubernetes Deployment Statefulset Daemonset metrics
 - Dashboard 15760: Kubernetes Views Pods
-- Custom Dashboard: HTTP Metrics for all 3 microservices
+- Custom Dashboard: Observability dashboard with logs, metrics, traces
 
-### Logging (namespace: aws-observability)
+### Logging
 
-**Fargate Logging Configuration**
+**Loki (In-Cluster):**
+- Node.js logs via winston-loki transport
+- LogQL queries in Grafana
+- Trace correlation via trace_id field
+
+**CloudWatch Logs (Fargate):**
 - Output: CloudWatch Logs
 - Log Group: `/aws/eks/ecommerce-poc-eks/application`
 - Format: JSON
 - All container logs from ecommerce-poc namespace
+
+### Distributed Tracing
+
+**Tempo (In-Cluster):**
+- OpenTelemetry instrumentation in Node.js
+- OTLP protocol (HTTP/gRPC)
+- Trace search by service, status code, duration
+- Trace-to-logs correlation in Grafana
+
+**Current State:**
+- ✅ Node.js: Full OpenTelemetry instrumentation
+- ❌ Python: Needs OpenTelemetry SDK
+- ❌ Go: Needs OpenTelemetry SDK
 
 ## Metrics Collected
 
@@ -297,11 +338,18 @@ aws logs tail /aws/eks/ecommerce-poc-eks/application --follow --region ap-southe
 
 ## Verification Checklist
 
-- [x] All 7 pods running (4 in ecommerce-poc, 3 in monitoring)
+- [x] All 8 pods running (4 in ecommerce-poc, 5 in monitoring)
 - [x] Prometheus scraping all targets
-- [x] Grafana accessible with dashboards
+- [x] Prometheus remote_write to AMP working
+- [x] Loki receiving logs from Node.js
+- [x] Tempo receiving traces from Node.js (1,300+ traces)
+- [x] Grafana accessible with all datasources configured
 - [x] All services responding to health checks
-- [x] Metrics being collected
-- [x] CloudWatch Logs receiving logs
+- [x] Metrics being collected and queryable
+- [x] Logs queryable via Loki and CloudWatch
+- [x] Traces searchable in Tempo
+- [x] Trace-to-logs correlation working
+- [x] Cross-service calls working (Node.js → Go → Python)
+- [x] Error endpoints generating test data
 - [x] Load testing working
 - [x] All files committed to repository

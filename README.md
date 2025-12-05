@@ -1,43 +1,40 @@
-# E-Commerce Microservices PoC on AWS EKS Fargate
+# E-Commerce Microservices PoC on AWS EKS
 
-Complete proof-of-concept for deploying a 3-microservice e-commerce application to AWS EKS using Fargate Spot, with full observability stack using Amazon Managed Prometheus (AMP).
+Complete proof-of-concept for deploying a 3-microservice e-commerce application to AWS EKS with **cloud-agnostic observability stack** (Loki, Tempo, Prometheus, Grafana).
 
 ## 🚀 Quick Links
 
 - **[Getting Started from Scratch](GETTING_STARTED.md)** - Complete step-by-step guide with explanations
-- **[AMP Setup Guide](AMP_SETUP_GUIDE.md)** - Step-by-step AMP integration guide
 - **[Deployment Summary](DEPLOYMENT_SUMMARY.md)** - Current state and what's deployed
 - **[Quick Reference](QUICK_REFERENCE.md)** - Common commands and queries
 - **[Changes Log](CHANGES.md)** - Recent updates and modifications
+- **[Observability Guide](OBSERVABILITY.md)** - Logs, metrics, and traces
 
 ## 📖 Documentation Guide
 
 **New to this project?** Start here:
 1. Read [GETTING_STARTED.md](GETTING_STARTED.md) - Explains everything from zero
 2. Follow the 7 phases to deploy (~38 minutes)
-3. Set up AMP: [AMP_SETUP_GUIDE.md](AMP_SETUP_GUIDE.md) - Complete AMP integration
-4. Use [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for daily operations
-
-**Setting up AMP?** Follow this path:
-1. [AMP_SETUP_GUIDE.md](AMP_SETUP_GUIDE.md) - Complete setup instructions
-2. [AMP_VERIFICATION.md](AMP_VERIFICATION.md) - Verify it's working
-3. [GRAFANA_AMP_SETUP.md](GRAFANA_AMP_SETUP.md) - Grafana configuration details
+3. Use [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for daily operations
 
 **Already deployed?** Quick access:
 - [DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md) - What's currently running
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Common commands
+- [OBSERVABILITY.md](OBSERVABILITY.md) - View logs, metrics, traces
 - [k8s/README.md](k8s/README.md) - Kubernetes details
 
 ## Architecture
 
 - **Region**: ap-southeast-1
-- **Compute**: EKS with Fargate Spot (no EC2 nodes)
-- **Services**: 3 microservices (Node.js, Python, Go)
-- **Metrics**: Prometheus (Helm) → Amazon Managed Prometheus (AMP)
-- **Visualization**: Grafana → AMP (SigV4 authentication)
-- **Logging**: Fargate built-in logging → CloudWatch Logs
+- **Compute**: EKS with Fargate Spot (⚠️ Note: Consider EC2 nodes for cloud-agnostic setup)
+- **Services**: 3 microservices (Node.js, Python, Go) with cross-service calls
+- **Observability**: Cloud-agnostic stack
+  - **Metrics**: Prometheus + Amazon Managed Prometheus (AMP)
+  - **Logs**: Loki (with winston-loki direct shipping)
+  - **Traces**: Tempo (OpenTelemetry)
+  - **Visualization**: Grafana
 - **Registry**: Amazon ECR
-- **Dashboards**: Custom HTTP metrics + 3 imported Kubernetes dashboards
+- **Dashboards**: Custom observability dashboard + 3 Kubernetes dashboards
 
 ## How It Works - Data Flow
 
@@ -51,11 +48,12 @@ Complete proof-of-concept for deploying a 3-microservice e-commerce application 
 2. Prometheus scrapes metrics every 15 seconds
    ├── Discovers pods via Kubernetes API
    ├── Filters by label (app=nodejs-catalog, etc.)
-   └── Stores time-series data in memory
+   ├── Stores time-series data in memory (emptyDir)
+   └── Sends to Amazon Managed Prometheus (AMP) via remote_write
 
-3. Grafana queries Prometheus
-   ├── Pre-configured datasource (http://prometheus.monitoring.svc.cluster.local:9090)
-   ├── Dashboards use PromQL queries
+3. Grafana queries both sources
+   ├── In-cluster Prometheus (real-time, last 2 hours)
+   └── AMP (persistent, long-term storage)
    └── Displays real-time metrics
 ```
 
@@ -76,10 +74,48 @@ Complete proof-of-concept for deploying a 3-microservice e-commerce application 
 
 ### Logging Flow
 ```
-1. Application writes logs to stdout/stderr
-2. Fargate captures container logs
-3. aws-observability ConfigMap routes to CloudWatch
-4. Logs appear in: /aws/eks/ecommerce-poc-eks/application
+1. Application writes JSON structured logs to stdout/stderr
+   ├── Node.js: winston + winston-loki (direct shipping)
+   ├── Python: Custom JsonFormatter
+   └── Go: Custom JSON logger
+
+2. Logs flow to two destinations:
+   ├── Loki (via winston-loki from Node.js)
+   └── CloudWatch Logs (via Fargate logging)
+
+3. Grafana queries Loki
+   ├── LogQL queries: {app="nodejs-catalog"}
+   ├── Trace correlation via trace_id field
+   └── Jump from logs to traces
+```
+
+### Distributed Tracing Flow
+```
+1. Node.js service instrumented with OpenTelemetry
+   ├── Auto-instrumentation: HTTP, Express
+   ├── Generates trace_id and span_id
+   └── Exports to Tempo via OTLP (port 4318)
+
+2. Tempo receives and stores traces
+   ├── OTLP receivers (HTTP/gRPC)
+   ├── Local backend storage (emptyDir)
+   └── 1 hour retention
+
+3. Grafana queries Tempo
+   ├── Search by service name, status code, duration
+   ├── View span timeline and service calls
+   └── Correlate with logs via trace_id
+```
+
+### Cross-Service Call Flow
+```
+User Request → Node.js Catalog → Go Inventory → Python Orders
+                    ↓                  ↓              ↓
+                 Trace ID          Trace ID       Trace ID
+                    ↓                  ↓              ↓
+                 Tempo             (logs)         (logs)
+                    ↓
+                 Grafana (unified view)
 ```
 
 ## Project Structure
@@ -97,6 +133,8 @@ Complete proof-of-concept for deploying a 3-microservice e-commerce application 
 │   ├── traffic-generator.yaml
 │   ├── prometheus/        # Prometheus + kube-state-metrics
 │   ├── grafana/           # Grafana + dashboard scripts
+│   ├── loki/              # Loki for logs
+│   ├── tempo/             # Tempo for traces
 │   ├── fargate-logging.yaml
 │   ├── load-test.sh       # Load testing script
 │   └── kustomization.yaml
@@ -347,9 +385,23 @@ kubectl scale deployment go-inventory -n ecommerce-poc --replicas=1
 
 **Estimated monthly costs:**
 - EKS Control Plane: ~$73
-- Fargate (7 pods): ~$50-60
+- Fargate pods:
+  - Application pods (3): ~$21-25
+  - Observability stack (4): ~$28-35
+    - Prometheus: ~$7-8
+    - Grafana: ~$7-8
+    - Loki: ~$7-8
+    - Tempo: ~$7-8
+  - Traffic generator (1): ~$7
 - NAT Gateway: ~$32
-- **Total: ~$155-165/month**
+- **Total: ~$161-172/month**
+
+**Observability Cost Comparison:**
+- Self-hosted (Loki + Tempo + Prometheus): ~$42-51/month (Fargate compute)
+- AWS Managed (CloudWatch Logs + AMP): ~$876/month
+- **Savings: 95% cheaper with self-hosted**
+
+**Note:** Using emptyDir storage (ephemeral). Add ~$2/month per 20GB EBS volume for persistent storage.
 
 **Set up billing alerts:**
 ```bash

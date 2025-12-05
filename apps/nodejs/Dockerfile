@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --production
 
-COPY app.js ./
+COPY *.js ./
 
 EXPOSE 3000
 
