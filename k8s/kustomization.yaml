@@ -2,13 +2,21 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
+  # Namespaces
   - namespace.yaml
+  
+  # Storage
+  - storage-class.yaml
+  
+  # Application deployments
   - nodejs-deployment.yaml
   - python-deployment.yaml
   - go-deployment.yaml
   - traffic-generator.yaml
-  - prometheus/prometheus-rbac.yaml
+  
+  # Monitoring stack
   - prometheus/prometheus-deployment.yaml
   - prometheus/kube-state-metrics.yaml
   - grafana/grafana-deployment.yaml
-  - fargate-logging.yaml
+  - loki/loki-deployment.yaml
+  - tempo/tempo-deployment.yaml

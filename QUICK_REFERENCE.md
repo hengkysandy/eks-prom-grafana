@@ -1,198 +1,117 @@
-# Quick Reference Guide
+# Quick Reference
 
-## Common Commands
+Common commands for managing the EKS deployment.
 
-### Access Grafana
+## Deployment
+
 ```bash
+# Deploy infrastructure
+cd terraform && terraform apply -auto-approve
+
+# Configure kubectl
+aws eks update-kubeconfig --region ap-southeast-1 --name ecommerce-poc-eks
+
+# Deploy K8s resources
+cd k8s && kubectl apply -k .
+```
+
+## Access Services
+
+```bash
+# Grafana (http://localhost:3001)
 kubectl port-forward -n monitoring svc/grafana 3001:3000
-# Open: http://localhost:3001
-# Login: admin/admin
-```
 
-### Access Prometheus
-```bash
+# Prometheus (http://localhost:9090)
 kubectl port-forward -n monitoring svc/prometheus 9090:9090
-# Open: http://localhost:9090
-```
 
-### Run Load Test
-```bash
-cd k8s
-./load-test.sh 30  # 30 seconds
-```
-
-### Import Grafana Dashboards
-```bash
-cd k8s/grafana
-./import-dashboards.sh
-```
-
-### Check Pod Status
-```bash
-kubectl get pods -n ecommerce-poc
-kubectl get pods -n monitoring
-```
-
-### View Logs
-```bash
-# Kubernetes logs
-kubectl logs -n ecommerce-poc <pod-name>
-
-# CloudWatch logs
-aws logs tail /aws/eks/ecommerce-poc-eks/application --follow --region ap-southeast-1
-```
-
-### Scale Services
-```bash
-# Scale up
-kubectl scale deployment nodejs-catalog -n ecommerce-poc --replicas=3
-
-# Scale down
-kubectl scale deployment nodejs-catalog -n ecommerce-poc --replicas=1
-```
-
-### Restart Deployments
-```bash
-kubectl rollout restart deployment/nodejs-catalog -n ecommerce-poc
-kubectl rollout restart deployment/python-orders -n ecommerce-poc
-kubectl rollout restart deployment/go-inventory -n ecommerce-poc
-```
-
-### Test Endpoints
-```bash
-# Port-forward first
+# Application
 kubectl port-forward -n ecommerce-poc svc/nodejs-catalog 3000:3000
-
-# Then test
-curl http://localhost:3000/health
-curl http://localhost:3000/products
-curl http://localhost:3000/metrics
 ```
 
-## Useful Queries (Prometheus/Grafana)
+## Check Status
 
-### Application Metrics
-```promql
-# Request rate per service
-rate(http_requests_total[5m])
+```bash
+# Nodes
+kubectl get nodes
 
-# Total requests
-sum(http_requests_total) by (service)
+# All pods
+kubectl get pods -A
 
-# Service availability
-up{job=~"nodejs-catalog|python-orders|go-inventory"}
+# PVCs
+kubectl get pvc -n monitoring
 
-# Request duration (95th percentile)
-histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+# Services
+kubectl get svc -A
 ```
 
-### Kubernetes Metrics
-```promql
-# Pod count by namespace
-count(kube_pod_info) by (namespace)
+## Logs
 
-# Pod CPU requests
-sum(kube_pod_container_resource_requests{resource="cpu"}) by (pod)
+```bash
+# Application logs
+kubectl logs -n ecommerce-poc -l app=nodejs-catalog -f
+kubectl logs -n ecommerce-poc -l app=python-orders -f
+kubectl logs -n ecommerce-poc -l app=go-inventory -f
 
-# Pod memory usage
-sum(kube_pod_container_resource_requests{resource="memory"}) by (pod)
-
-# Deployment replicas
-kube_deployment_status_replicas{namespace="ecommerce-poc"}
-
-# Pod restarts
-kube_pod_container_status_restarts_total
+# Monitoring logs
+kubectl logs -n monitoring -l app=prometheus -f
+kubectl logs -n monitoring -l app=grafana -f
 ```
 
 ## Troubleshooting
 
-### Pods Pending
 ```bash
-kubectl describe pod <pod-name> -n <namespace>
-aws eks list-fargate-profiles --cluster-name ecommerce-poc-eks --region ap-southeast-1
+# Describe pod
+kubectl describe pod -n <namespace> <pod-name>
+
+# Check events
+kubectl get events -n <namespace> --sort-by='.lastTimestamp'
+
+# Check EBS CSI driver
+kubectl get pods -n kube-system | grep ebs
+kubectl logs -n kube-system -l app=ebs-csi-controller
 ```
 
-### ImagePullBackOff
+## Cleanup
+
 ```bash
-aws ecr describe-images --repository-name ecommerce-nodejs-catalog --region ap-southeast-1
-kubectl describe pod <pod-name> -n ecommerce-poc
+# Delete K8s resources
+kubectl delete -k k8s/
+
+# Destroy infrastructure
+cd terraform && terraform destroy -auto-approve
 ```
 
-### Prometheus Not Scraping
-```bash
-kubectl port-forward -n monitoring svc/prometheus 9090:9090
-# Check: http://localhost:9090/targets
-kubectl logs -n monitoring deployment/prometheus
+## Grafana Queries
+
+### Prometheus (PromQL)
+
+```promql
+# Request rate
+rate(http_requests_total[5m])
+
+# Error rate
+rate(http_requests_total{status_code=~"5.."}[5m])
+
+# Response time p95
+histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
 ```
 
-### Grafana No Data
-```bash
-# Check datasource
-kubectl port-forward -n monitoring svc/grafana 3001:3000
-# Go to: http://localhost:3001/datasources
+### Loki (LogQL)
 
-# Test Prometheus connection
-kubectl exec -n monitoring deployment/grafana -- \
-  wget -qO- http://prometheus.monitoring.svc.cluster.local:9090/api/v1/targets
+```logql
+# All logs from app
+{app="nodejs-catalog"}
+
+# Error logs
+{app="nodejs-catalog"} |= "error"
+
+# JSON parsing
+{app="nodejs-catalog"} | json | level="error"
 ```
 
-## File Locations
+### Tempo
 
-### Infrastructure
-- `terraform/main.tf` - EKS, ECR, networking
-- `terraform/outputs.tf` - Output values
-- `terraform/variables.tf` - Configuration
-
-### Kubernetes
-- `k8s/namespace.yaml` - Namespaces
-- `k8s/*-deployment.yaml` - Service deployments
-- `k8s/traffic-generator.yaml` - Load testing pod
-- `k8s/prometheus/` - Prometheus + kube-state-metrics
-- `k8s/grafana/` - Grafana + dashboards
-- `k8s/fargate-logging.yaml` - CloudWatch logging
-
-### Scripts
-- `apps/build-and-push.sh` - Build and push Docker images
-- `k8s/load-test.sh` - Load testing
-- `k8s/grafana/import-dashboards.sh` - Import Grafana dashboards
-
-### Documentation
-- `README.md` - Main deployment guide
-- `k8s/README.md` - Kubernetes documentation
-- `DEPLOYMENT_SUMMARY.md` - Current state summary
-- `QUICK_REFERENCE.md` - This file
-
-## URLs
-
-- Grafana: http://localhost:3001 (after port-forward)
-- Prometheus: http://localhost:9090 (after port-forward)
-- Node.js: http://localhost:3000 (after port-forward)
-- Python: http://localhost:5000 (after port-forward)
-- Go: http://localhost:8080 (after port-forward)
-
-## Grafana Dashboards
-
-- Dashboard 3119: Kubernetes Cluster Monitoring
-- Dashboard 8588: Kubernetes Deployment Metrics
-- Dashboard 15760: Kubernetes Views Pods
-- Custom: HTTP Metrics (all services)
-
-## Resource Limits
-
-| Service | CPU Request | CPU Limit | Memory Request | Memory Limit |
-|---------|-------------|-----------|----------------|--------------|
-| nodejs-catalog | 250m | 500m | 512Mi | 1Gi |
-| python-orders | 250m | 500m | 512Mi | 1Gi |
-| go-inventory | 200m | 400m | 256Mi | 512Mi |
-| traffic-generator | 50m | 100m | 64Mi | 128Mi |
-| prometheus | 250m | 500m | 512Mi | 1Gi |
-| kube-state-metrics | 100m | 200m | 128Mi | 256Mi |
-| grafana | 200m | 400m | 256Mi | 512Mi |
-
-## Cost Estimate
-
-- EKS Control Plane: ~$73/month
-- Fargate (7 pods): ~$50-60/month
-- NAT Gateway: ~$32/month
-- CloudWatch Logs: ~$5/month
-- **Total: ~$165-180/month**
+Search by:
+- Service Name: `nodejs-catalog`
+- Tags: `http.status_code=500`
+- Duration: `>100ms`

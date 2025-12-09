@@ -12,11 +12,8 @@ provider "aws" {
   region = var.aws_region
 }
 
-# NOTE: This configuration creates AWS resources but does NOT execute automatically.
-# The operator must manually run `terraform init`, `terraform plan`, and confirm before `terraform apply`.
-
 # ============================================================================
-# Data sources for existing VPC
+# Data sources
 # ============================================================================
 data "aws_vpc" "existing" {
   id = var.vpc_id
@@ -27,17 +24,17 @@ data "aws_availability_zones" "available" {
 }
 
 # ============================================================================
-# Private Subnets for Fargate (required)
+# Private Subnets for EKS
 # ============================================================================
 resource "aws_subnet" "private" {
   count             = 3
   vpc_id            = var.vpc_id
-  cidr_block        = cidrsubnet("172.31.0.0/16", 4, count.index + 8)
+  cidr_block        = cidrsubnet("172.31.0.0/16", 4, count.index + 11)  # Use 172.31.176.0/20, 172.31.192.0/20, 172.31.208.0/20
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
   tags = {
-    Name = "${var.cluster_name}-private-${count.index + 1}"
-    "kubernetes.io/role/internal-elb" = "1"
+    Name                                        = "${var.cluster_name}-private-${count.index + 1}"
+    "kubernetes.io/role/internal-elb"           = "1"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
 }
@@ -45,16 +42,16 @@ resource "aws_subnet" "private" {
 # Elastic IP for NAT Gateway
 resource "aws_eip" "nat" {
   domain = "vpc"
-  
+
   tags = {
     Name = "${var.cluster_name}-nat-eip"
   }
 }
 
-# NAT Gateway in first public subnet
+# NAT Gateway
 resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat.id
-  subnet_id     = var.subnet_ids[0]  # Use existing public subnet
+  subnet_id     = var.subnet_ids[0]
 
   tags = {
     Name = "${var.cluster_name}-nat-gw"
@@ -75,7 +72,6 @@ resource "aws_route_table" "private" {
   }
 }
 
-# Associate private subnets with private route table
 resource "aws_route_table_association" "private" {
   count          = 3
   subnet_id      = aws_subnet.private[count.index].id
@@ -106,10 +102,10 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
 }
 
 # ============================================================================
-# IAM Role for Fargate Pod Execution
+# IAM Role for EC2 Node Group
 # ============================================================================
-resource "aws_iam_role" "fargate_pod_execution_role" {
-  name = "${var.cluster_name}-fargate-pod-execution-role"
+resource "aws_iam_role" "eks_node_role" {
+  name = "${var.cluster_name}-node-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -117,35 +113,31 @@ resource "aws_iam_role" "fargate_pod_execution_role" {
       Action = "sts:AssumeRole"
       Effect = "Allow"
       Principal = {
-        Service = "eks-fargate-pods.amazonaws.com"
+        Service = "ec2.amazonaws.com"
       }
     }]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "fargate_pod_execution_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
-  role       = aws_iam_role.fargate_pod_execution_role.name
+resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.eks_node_role.name
 }
 
-# CloudWatch Logs policy for Fargate
-resource "aws_iam_role_policy" "fargate_logs_policy" {
-  name = "${var.cluster_name}-fargate-logs"
-  role = aws_iam_role.fargate_pod_execution_role.id
+resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.eks_node_role.name
+}
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "logs:CreateLogStream",
-        "logs:CreateLogGroup",
-        "logs:DescribeLogStreams",
-        "logs:PutLogEvents"
-      ]
-      Resource = "*"
-    }]
-  })
+resource "aws_iam_role_policy_attachment" "eks_container_registry" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.eks_node_role.name
+}
+
+# EBS CSI Driver policy for persistent volumes
+resource "aws_iam_role_policy_attachment" "eks_ebs_csi" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  role       = aws_iam_role.eks_node_role.name
 }
 
 # ============================================================================
@@ -168,7 +160,7 @@ resource "aws_eks_cluster" "main" {
 }
 
 # ============================================================================
-# OIDC Provider for IRSA (IAM Roles for Service Accounts)
+# OIDC Provider for IRSA
 # ============================================================================
 data "tls_certificate" "eks" {
   url = aws_eks_cluster.main.identity[0].oidc[0].issuer
@@ -185,95 +177,80 @@ resource "aws_iam_openid_connect_provider" "eks" {
 }
 
 # ============================================================================
-# Fargate Profile for application namespace
-# NOTE: Fargate Spot is requested via capacityType in the profile
+# EKS EC2 Node Group
 # ============================================================================
-resource "aws_eks_fargate_profile" "app_profile" {
-  cluster_name           = aws_eks_cluster.main.name
-  fargate_profile_name   = "ecommerce-app-profile"
-  pod_execution_role_arn = aws_iam_role.fargate_pod_execution_role.arn
-  subnet_ids             = aws_subnet.private[*].id
+resource "aws_eks_node_group" "main" {
+  cluster_name    = aws_eks_cluster.main.name
+  node_group_name = "${var.cluster_name}-node-group"
+  node_role_arn   = aws_iam_role.eks_node_role.arn
+  subnet_ids      = aws_subnet.private[*].id
 
-  selector {
-    namespace = var.namespace
+  scaling_config {
+    desired_size = var.node_desired_size
+    max_size     = var.node_max_size
+    min_size     = var.node_min_size
   }
 
-  # NOTE: Fargate Spot is the default for Fargate profiles.
-  # AWS automatically uses Spot capacity when available.
-}
+  instance_types = var.node_instance_types
+  capacity_type  = "ON_DEMAND"
 
-# Fargate profile for kube-system (CoreDNS)
-resource "aws_eks_fargate_profile" "kube_system_profile" {
-  cluster_name           = aws_eks_cluster.main.name
-  fargate_profile_name   = "kube-system-profile"
-  pod_execution_role_arn = aws_iam_role.fargate_pod_execution_role.arn
-  subnet_ids             = aws_subnet.private[*].id
-
-  selector {
-    namespace = "kube-system"
-  }
-}
-
-# Fargate profile for monitoring namespace (Prometheus, Fluent Bit)
-resource "aws_eks_fargate_profile" "monitoring_profile" {
-  cluster_name           = aws_eks_cluster.main.name
-  fargate_profile_name   = "monitoring-profile"
-  pod_execution_role_arn = aws_iam_role.fargate_pod_execution_role.arn
-  subnet_ids             = aws_subnet.private[*].id
-
-  selector {
-    namespace = "monitoring"
-  }
-}
-
-# ============================================================================
-# Security Group for VPC Endpoints
-# ============================================================================
-resource "aws_security_group" "vpc_endpoints" {
-  name        = "${var.cluster_name}-vpc-endpoints-sg"
-  description = "Security group for VPC endpoints"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description     = "Allow HTTPS from EKS cluster"
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    security_groups = [aws_eks_cluster.main.vpc_config[0].cluster_security_group_id]
+  labels = {
+    role = "general"
   }
 
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_worker_node_policy,
+    aws_iam_role_policy_attachment.eks_cni_policy,
+    aws_iam_role_policy_attachment.eks_container_registry,
+    aws_iam_role_policy_attachment.eks_ebs_csi,
+  ]
 
   tags = {
-    Name = "${var.cluster_name}-vpc-endpoints-sg"
+    Name = "${var.cluster_name}-node-group"
   }
 }
 
 # ============================================================================
-# VPC Endpoint for STS (required for IRSA)
+# EBS CSI Driver Addon
 # ============================================================================
-resource "aws_vpc_endpoint" "sts" {
-  vpc_id              = var.vpc_id
-  service_name        = "com.amazonaws.${var.aws_region}.sts"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-  private_dns_enabled = true
+resource "aws_eks_addon" "ebs_csi" {
+  cluster_name             = aws_eks_cluster.main.name
+  addon_name               = "aws-ebs-csi-driver"
+  addon_version            = "v1.37.0-eksbuild.1"
+  service_account_role_arn = aws_iam_role.ebs_csi_role.arn
 
-  tags = {
-    Name = "${var.cluster_name}-sts-endpoint"
-  }
+  depends_on = [aws_eks_node_group.main]
+}
+
+# IAM Role for EBS CSI Driver
+resource "aws_iam_role" "ebs_csi_role" {
+  name = "${var.cluster_name}-ebs-csi-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+          "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  role       = aws_iam_role.ebs_csi_role.name
 }
 
 # ============================================================================
-# ECR Repositories for microservices
-# NOTE: Operator will build and push images manually
+# ECR Repositories
 # ============================================================================
 resource "aws_ecr_repository" "nodejs_service" {
   name                 = "ecommerce-nodejs-catalog"
@@ -306,14 +283,9 @@ resource "aws_ecr_repository" "go_service" {
 }
 
 # ============================================================================
-# CloudWatch Log Group for application logs
+# CloudWatch Log Group (optional, for cluster logs)
 # ============================================================================
-resource "aws_cloudwatch_log_group" "app_logs" {
-  name              = "/aws/eks/${var.cluster_name}/application"
-  retention_in_days = 7
-}
-
-resource "aws_cloudwatch_log_group" "fargate_logs" {
-  name              = "/aws/eks/${var.cluster_name}/fargate"
+resource "aws_cloudwatch_log_group" "eks_cluster" {
+  name              = "/aws/eks/${var.cluster_name}/cluster"
   retention_in_days = 7
 }
