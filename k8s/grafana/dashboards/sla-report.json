@@ -1,0 +1,224 @@
+{
+  "dashboard": {
+    "title": "SLA Report - Service Availability",
+    "uid": "sla-report",
+    "tags": ["sla", "availability", "uptime", "report"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "refresh": "1m",
+    "time": {"from": "now-24h", "to": "now"},
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(up{job=~\"nodejs-catalog|python-orders|go-inventory\"}, job)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true,
+          "current": {"text": "All", "value": "$__all"}
+        },
+        {
+          "name": "timerange",
+          "type": "custom",
+          "options": [
+            {"text": "Last 24 Hours", "value": "24h"},
+            {"text": "Last 7 Days", "value": "7d"},
+            {"text": "Last 30 Days", "value": "30d"},
+            {"text": "Last 90 Days", "value": "90d"},
+            {"text": "Last 365 Days", "value": "365d"}
+          ],
+          "current": {"text": "Last 24 Hours", "value": "24h"}
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "SLA Overview",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "nodejs-catalog Uptime",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 8, "x": 0, "y": 1},
+        "targets": [{"expr": "avg_over_time(up{job=\"nodejs-catalog\"}[$timerange]) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 3, "displayName": "nodejs-catalog", "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 99, "color": "yellow"}, {"value": 99.9, "color": "green"}]}, "mappings": [{"type": "special", "options": {"match": "null", "result": {"text": "N/A"}}}]}}
+      },
+      {
+        "id": 3,
+        "title": "python-orders Uptime",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 8, "x": 8, "y": 1},
+        "targets": [{"expr": "avg_over_time(up{job=\"python-orders\"}[$timerange]) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 3, "displayName": "python-orders", "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 99, "color": "yellow"}, {"value": 99.9, "color": "green"}]}}}
+      },
+      {
+        "id": 4,
+        "title": "go-inventory Uptime",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 8, "x": 16, "y": 1},
+        "targets": [{"expr": "avg_over_time(up{job=\"go-inventory\"}[$timerange]) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 3, "displayName": "go-inventory", "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 99, "color": "yellow"}, {"value": 99.9, "color": "green"}]}}}
+      },
+      {
+        "id": 5,
+        "title": "Overall Platform Uptime",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 6},
+        "targets": [{"expr": "avg(avg_over_time(up{job=~\"nodejs-catalog|python-orders|go-inventory\"}[$timerange])) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 3, "min": 0, "max": 100, "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 95, "color": "orange"}, {"value": 99, "color": "yellow"}, {"value": 99.9, "color": "green"}]}}}
+      },
+      {
+        "id": 6,
+        "title": "Success Rate (2XX)",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 6},
+        "targets": [{"expr": "sum(increase(http_requests_total{job=~\"$service\", status_code=~\"2..\"}[$timerange])) / sum(increase(http_requests_total{job=~\"$service\"}[$timerange])) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "min": 0, "max": 100, "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 95, "color": "orange"}, {"value": 99, "color": "yellow"}, {"value": 99.9, "color": "green"}]}}}
+      },
+      {
+        "id": 7,
+        "title": "Error Rate (5XX)",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 6},
+        "targets": [{"expr": "sum(increase(http_requests_total{job=~\"$service\", status_code=~\"5..\"}[$timerange])) / sum(increase(http_requests_total{job=~\"$service\"}[$timerange])) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "min": 0, "max": 100, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 0.1, "color": "yellow"}, {"value": 1, "color": "orange"}, {"value": 5, "color": "red"}]}}}
+      },
+      {
+        "id": 8,
+        "title": "SLA Metrics Table",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 12}
+      },
+      {
+        "id": 9,
+        "title": "Service SLA Summary",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 13},
+        "targets": [
+          {"expr": "avg_over_time(up{job=~\"nodejs-catalog|python-orders|go-inventory\"}[$timerange]) * 100", "format": "table", "instant": true, "refId": "A"},
+          {"expr": "sum(increase(http_requests_total{job=~\"nodejs-catalog|python-orders|go-inventory\"}[$timerange])) by (job)", "format": "table", "instant": true, "refId": "B"},
+          {"expr": "sum(increase(http_requests_total{job=~\"nodejs-catalog|python-orders|go-inventory\", status_code=~\"5..\"}[$timerange])) by (job)", "format": "table", "instant": true, "refId": "C"}
+        ],
+        "transformations": [
+          {"id": "merge"},
+          {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true, "instance": true}, "renameByName": {"job": "Service", "Value #A": "Uptime %", "Value #B": "Total Requests", "Value #C": "5XX Errors"}}}
+        ],
+        "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "Uptime %"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 3}]}]}
+      },
+      {
+        "id": 10,
+        "title": "Uptime History",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 21}
+      },
+      {
+        "id": 11,
+        "title": "Service Availability Over Time",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 22},
+        "targets": [
+          {"expr": "up{job=\"nodejs-catalog\"}", "legendFormat": "nodejs-catalog", "refId": "A"},
+          {"expr": "up{job=\"python-orders\"}", "legendFormat": "python-orders", "refId": "B"},
+          {"expr": "up{job=\"go-inventory\"}", "legendFormat": "go-inventory", "refId": "C"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "short", "min": 0, "max": 1, "custom": {"fillOpacity": 30, "stacking": {"mode": "none"}}, "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+      },
+      {
+        "id": 12,
+        "title": "Downtime Events",
+        "type": "state-timeline",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 30},
+        "targets": [
+          {"expr": "up{job=\"nodejs-catalog\"}", "legendFormat": "nodejs-catalog", "refId": "A"},
+          {"expr": "up{job=\"python-orders\"}", "legendFormat": "python-orders", "refId": "B"},
+          {"expr": "up{job=\"go-inventory\"}", "legendFormat": "go-inventory", "refId": "C"}
+        ],
+        "fieldConfig": {"defaults": {"custom": {"fillOpacity": 80}, "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+      },
+      {
+        "id": 13,
+        "title": "Error Tracking",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 36}
+      },
+      {
+        "id": 14,
+        "title": "5XX Errors Over Time",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 37},
+        "targets": [{"expr": "sum(increase(http_requests_total{job=~\"$service\", status_code=~\"5..\"}[5m])) by (job)", "legendFormat": "{{job}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 30}, "color": {"mode": "palette-classic"}}}
+      },
+      {
+        "id": 15,
+        "title": "5XX Errors (Last 5 Min)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 12, "y": 37},
+        "targets": [{"expr": "sum(increase(http_requests_total{status_code=~\"5..\"}[5m]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "5XX (5m)", "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 5, "color": "yellow"}, {"value": 10, "color": "red"}]}}}
+      },
+      {
+        "id": 16,
+        "title": "5XX Errors (Last 1 Hour)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 37},
+        "targets": [{"expr": "sum(increase(http_requests_total{status_code=~\"5..\"}[1h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "5XX (1h)", "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 10, "color": "yellow"}, {"value": 50, "color": "red"}]}}}
+      },
+      {
+        "id": 17,
+        "title": "5XX Errors (Last 24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 37},
+        "targets": [{"expr": "sum(increase(http_requests_total{status_code=~\"5..\"}[24h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "5XX (24h)", "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 50, "color": "yellow"}, {"value": 200, "color": "red"}]}}}
+      },
+      {
+        "id": 18,
+        "title": "Response Time SLA",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 12, "y": 41},
+        "targets": [{"expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "s", "decimals": 3, "displayName": "P95 Latency", "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 0.5, "color": "yellow"}, {"value": 1, "color": "red"}]}}}
+      },
+      {
+        "id": 19,
+        "title": "Requests Under 1s",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 41},
+        "targets": [{"expr": "sum(increase(http_request_duration_seconds_bucket{job=~\"$service\", le=\"1\"}[$timerange])) / sum(increase(http_request_duration_seconds_count{job=~\"$service\"}[$timerange])) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "displayName": "< 1s", "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 90, "color": "yellow"}, {"value": 99, "color": "green"}]}}}
+      },
+      {
+        "id": 20,
+        "title": "Total Requests",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 41},
+        "targets": [{"expr": "sum(increase(http_requests_total{job=~\"$service\"}[$timerange]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "Total Requests", "thresholds": {"steps": [{"value": null, "color": "blue"}]}}}
+      },
+      {
+        "id": 21,
+        "title": "SLA Targets",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 45}
+      },
+      {
+        "id": 22,
+        "title": "SLA Target Reference",
+        "type": "text",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 46},
+        "options": {
+          "mode": "markdown",
+          "content": "## SLA Targets\n\n| SLA Level | Uptime % | Downtime/Year | Downtime/Month | Downtime/Week |\n|-----------|----------|---------------|----------------|---------------|\n| 99% | 99.00% | 3.65 days | 7.31 hours | 1.68 hours |\n| 99.9% | 99.90% | 8.77 hours | 43.83 min | 10.08 min |\n| 99.95% | 99.95% | 4.38 hours | 21.92 min | 5.04 min |\n| 99.99% | 99.99% | 52.60 min | 4.38 min | 1.01 min |\n\n### Current Thresholds\n- 🟢 **Green**: ≥ 99.9% uptime\n- 🟡 **Yellow**: 99.0% - 99.9% uptime\n- 🔴 **Red**: < 99.0% uptime"
+        }
+      }
+    ]
+  },
+  "overwrite": true
+}

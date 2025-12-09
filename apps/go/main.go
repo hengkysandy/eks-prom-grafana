@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 type Item struct {
@@ -80,6 +87,41 @@ func logJSON(level, message string, method, path string, statusCode int) {
 	}
 	jsonData, _ := json.Marshal(entry)
 	fmt.Fprintln(os.Stdout, string(jsonData))
+}
+
+func initTracer() func(context.Context) error {
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "tempo.monitoring.svc.cluster.local:4318"
+	} else {
+		// Remove http:// prefix and /v1/traces suffix if present
+		endpoint = strings.TrimPrefix(endpoint, "http://")
+		endpoint = strings.TrimPrefix(endpoint, "https://")
+		endpoint = strings.TrimSuffix(endpoint, "/v1/traces")
+	}
+
+	exporter, err := otlptracehttp.New(context.Background(),
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
+	)
+	if err != nil {
+		log.Fatalf("Failed to create OTLP exporter: %v", err)
+	}
+
+	res, err := resource.New(context.Background(),
+		resource.WithAttributes(semconv.ServiceName("go-inventory")),
+	)
+	if err != nil {
+		log.Fatalf("Failed to create resource: %v", err)
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+	otel.SetTracerProvider(tp)
+
+	return tp.Shutdown
 }
 
 func metricsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -197,12 +239,15 @@ func errorTimeoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/health", metricsMiddleware(healthHandler))
-	http.HandleFunc("/inventory", metricsMiddleware(inventoryHandler))
-	http.HandleFunc("/inventory/", metricsMiddleware(inventoryItemHandler))
-	http.HandleFunc("/error/500", metricsMiddleware(error500Handler))
-	http.HandleFunc("/error/db", metricsMiddleware(errorDBHandler))
-	http.HandleFunc("/error/timeout", metricsMiddleware(errorTimeoutHandler))
+	shutdown := initTracer()
+	defer shutdown(context.Background())
+
+	http.Handle("/health", otelhttp.NewHandler(http.HandlerFunc(metricsMiddleware(healthHandler)), "health"))
+	http.Handle("/inventory", otelhttp.NewHandler(http.HandlerFunc(metricsMiddleware(inventoryHandler)), "inventory"))
+	http.Handle("/inventory/", otelhttp.NewHandler(http.HandlerFunc(metricsMiddleware(inventoryItemHandler)), "inventory-item"))
+	http.Handle("/error/500", otelhttp.NewHandler(http.HandlerFunc(metricsMiddleware(error500Handler)), "error-500"))
+	http.Handle("/error/db", otelhttp.NewHandler(http.HandlerFunc(metricsMiddleware(errorDBHandler)), "error-db"))
+	http.Handle("/error/timeout", otelhttp.NewHandler(http.HandlerFunc(metricsMiddleware(errorTimeoutHandler)), "error-timeout"))
 	http.Handle("/metrics", promhttp.Handler())
 
 	port := "8080"

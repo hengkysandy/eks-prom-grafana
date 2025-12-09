@@ -1,0 +1,167 @@
+{
+  "dashboard": {
+    "title": "Kubernetes Cluster Overview",
+    "uid": "k8s-cluster-overview",
+    "tags": ["kubernetes", "infrastructure", "nodes"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "refresh": "30s",
+    "templating": {
+      "list": [
+        {
+          "name": "node",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(node_uname_info, nodename)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cluster Health",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+        "collapsed": false
+      },
+      {
+        "id": 2,
+        "title": "Nodes Ready",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 1},
+        "targets": [{"expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "refId": "A"}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 1, "color": "green"}]}}}
+      },
+      {
+        "id": 3,
+        "title": "Total Pods",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 4, "y": 1},
+        "targets": [{"expr": "sum(kube_pod_status_phase{phase=\"Running\"})", "refId": "A"}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"value": null, "color": "blue"}]}}}
+      },
+      {
+        "id": 4,
+        "title": "Pods Pending",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 1},
+        "targets": [{"expr": "sum(kube_pod_status_phase{phase=\"Pending\"})", "refId": "A"}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 1, "color": "yellow"}, {"value": 5, "color": "red"}]}}}
+      },
+      {
+        "id": 5,
+        "title": "Pods Failed",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 12, "y": 1},
+        "targets": [{"expr": "sum(kube_pod_status_phase{phase=\"Failed\"})", "refId": "A"}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 1, "color": "red"}]}}}
+      },
+      {
+        "id": 6,
+        "title": "Container Restarts (1h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 1},
+        "targets": [{"expr": "sum(increase(kube_pod_container_status_restarts_total[1h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 5, "color": "yellow"}, {"value": 20, "color": "red"}]}}}
+      },
+      {
+        "id": 7,
+        "title": "Active Alerts",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 1},
+        "targets": [{"expr": "count(ALERTS{alertstate=\"firing\"})", "refId": "A"}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 1, "color": "yellow"}, {"value": 5, "color": "red"}]}}}
+      },
+      {
+        "id": 8,
+        "title": "Node Resources",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5},
+        "collapsed": false
+      },
+      {
+        "id": 9,
+        "title": "Node CPU Usage %",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+        "targets": [{"expr": "100 - (avg by(node) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{node}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 70, "color": "yellow"}, {"value": 85, "color": "red"}]}}}
+      },
+      {
+        "id": 10,
+        "title": "Node Memory Usage %",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+        "targets": [{"expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100", "legendFormat": "{{instance}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 70, "color": "yellow"}, {"value": 85, "color": "red"}]}}}
+      },
+      {
+        "id": 11,
+        "title": "CPU Requests vs Capacity",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 14},
+        "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"}) / sum(kube_node_status_allocatable{resource=\"cpu\"}) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 70, "color": "yellow"}, {"value": 90, "color": "red"}]}}}
+      },
+      {
+        "id": 12,
+        "title": "Memory Requests vs Capacity",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 14},
+        "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"}) / sum(kube_node_status_allocatable{resource=\"memory\"}) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 70, "color": "yellow"}, {"value": 90, "color": "red"}]}}}
+      },
+      {
+        "id": 13,
+        "title": "Node Disk Usage %",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 14},
+        "targets": [{"expr": "(1 - (node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\",mountpoint=\"/\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\",mountpoint=\"/\"})) * 100", "legendFormat": "{{instance}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}}
+      },
+      {
+        "id": 14,
+        "title": "Persistent Volumes",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 20},
+        "collapsed": false
+      },
+      {
+        "id": 15,
+        "title": "PVC Usage",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 21},
+        "targets": [
+          {"expr": "kubelet_volume_stats_used_bytes", "format": "table", "instant": true, "refId": "A"},
+          {"expr": "kubelet_volume_stats_capacity_bytes", "format": "table", "instant": true, "refId": "B"},
+          {"expr": "kubelet_volume_stats_available_bytes", "format": "table", "instant": true, "refId": "C"}
+        ],
+        "transformations": [
+          {"id": "merge"},
+          {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true, "endpoint": true, "instance": true, "job": true, "metrics_path": true, "node": true, "service": true}, "renameByName": {"namespace": "Namespace", "persistentvolumeclaim": "PVC", "Value #A": "Used", "Value #B": "Capacity", "Value #C": "Available"}}}
+        ],
+        "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": [{"matcher": {"id": "byName", "options": "Used"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "gradient"}}]}]}
+      },
+      {
+        "id": 16,
+        "title": "PVC Used %",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 29},
+        "targets": [{"expr": "kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes * 100", "legendFormat": "{{namespace}}/{{persistentvolumeclaim}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 70, "color": "yellow"}, {"value": 85, "color": "red"}]}}}
+      },
+      {
+        "id": 17,
+        "title": "PVC Free Space",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 29},
+        "targets": [{"expr": "kubelet_volume_stats_available_bytes", "legendFormat": "{{namespace}}/{{persistentvolumeclaim}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "bytes", "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 1073741824, "color": "yellow"}, {"value": 5368709120, "color": "green"}]}}}
+      }
+    ]
+  },
+  "overwrite": true
+}

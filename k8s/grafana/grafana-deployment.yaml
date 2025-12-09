@@ -30,6 +30,7 @@ data:
         type: loki
         access: proxy
         url: http://loki.monitoring.svc.cluster.local:3100
+        uid: loki
         editable: true
         jsonData:
           derivedFields:
@@ -46,10 +47,39 @@ data:
         jsonData:
           tracesToLogs:
             datasourceUid: loki
-            tags: ['app']
-            mappedTags: [{ key: 'service.name', value: 'app' }]
+            tags: ['app', 'container']
+            mappedTags: [{ key: 'service.name', value: 'container' }]
             mapTagNamesEnabled: true
             filterByTraceID: true
+          serviceMap:
+            datasourceUid: prometheus
+      - name: Alertmanager
+        type: alertmanager
+        access: proxy
+        url: http://alertmanager.monitoring.svc.cluster.local:9093
+        uid: alertmanager
+        editable: true
+        jsonData:
+          implementation: prometheus
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provisioning
+  namespace: monitoring
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -65,6 +95,9 @@ spec:
     metadata:
       labels:
         app: grafana
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
     spec:
       securityContext:
         fsGroup: 472
@@ -80,6 +113,10 @@ spec:
               value: "admin"
             - name: GF_USERS_ALLOW_SIGN_UP
               value: "false"
+            - name: GF_ALERTING_ENABLED
+              value: "false"
+            - name: GF_UNIFIED_ALERTING_ENABLED
+              value: "true"
           resources:
             requests:
               cpu: 100m
@@ -90,12 +127,17 @@ spec:
           volumeMounts:
             - name: datasources
               mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provisioning
+              mountPath: /etc/grafana/provisioning/dashboards
             - name: data
               mountPath: /var/lib/grafana
       volumes:
         - name: datasources
           configMap:
             name: grafana-datasources
+        - name: dashboard-provisioning
+          configMap:
+            name: grafana-dashboard-provisioning
         - name: data
           persistentVolumeClaim:
             claimName: grafana-data

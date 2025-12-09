@@ -1,0 +1,293 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  alert-rules.yml: |
+    groups:
+      # ============================================
+      # KUBERNETES INFRASTRUCTURE ALERTS
+      # ============================================
+      - name: kubernetes-infrastructure
+        rules:
+          # Node Alerts
+          - alert: NodeHighCPU
+            expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage on {{ $labels.instance }}"
+              description: "CPU usage is above 80% (current: {{ $value | printf \"%.1f\" }}%)"
+
+          - alert: NodeHighMemory
+            expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage on {{ $labels.instance }}"
+              description: "Memory usage is above 85% (current: {{ $value | printf \"%.1f\" }}%)"
+
+          - alert: NodeDiskSpaceLow
+            expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Low disk space on {{ $labels.instance }}"
+              description: "Disk usage is above 85% on {{ $labels.mountpoint }} (current: {{ $value | printf \"%.1f\" }}%)"
+
+          - alert: NodeDiskSpaceCritical
+            expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) * 100 > 95
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Critical disk space on {{ $labels.instance }}"
+              description: "Disk usage is above 95% on {{ $labels.mountpoint }}"
+
+          - alert: NodeNotReady
+            expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Node {{ $labels.node }} is not ready"
+              description: "Node has been in NotReady state for more than 5 minutes"
+
+          # Pod Alerts
+          - alert: PodCrashLooping
+            expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 3
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+              description: "Pod has restarted {{ $value | printf \"%.0f\" }} times in the last 15 minutes"
+
+          - alert: PodNotReady
+            expr: kube_pod_status_ready{condition="true"} == 0
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is not ready"
+              description: "Pod has been in non-ready state for more than 10 minutes"
+
+          - alert: PodHighCPU
+            expr: sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (namespace, pod) / sum(kube_pod_container_resource_requests{resource="cpu"}) by (namespace, pod) * 100 > 150
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage in pod {{ $labels.namespace }}/{{ $labels.pod }}"
+              description: "Pod is using {{ $value | printf \"%.0f\" }}% of requested CPU"
+
+          - alert: PodHighMemory
+            expr: sum(container_memory_working_set_bytes{container!=""}) by (namespace, pod) / sum(kube_pod_container_resource_requests{resource="memory"}) by (namespace, pod) * 100 > 150
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage in pod {{ $labels.namespace }}/{{ $labels.pod }}"
+              description: "Pod is using {{ $value | printf \"%.0f\" }}% of requested memory"
+
+          - alert: PodOOMKilled
+            expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Container OOMKilled in {{ $labels.namespace }}/{{ $labels.pod }}"
+              description: "Container {{ $labels.container }} was OOMKilled"
+
+          # Deployment Alerts
+          - alert: DeploymentReplicasMismatch
+            expr: kube_deployment_spec_replicas != kube_deployment_status_replicas_available
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} replicas mismatch"
+              description: "Expected {{ $value }} replicas but only {{ $value }} available"
+
+          # PVC Alerts
+          - alert: PVCAlmostFull
+            expr: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} almost full"
+              description: "PVC is {{ $value | printf \"%.1f\" }}% full"
+
+      # ============================================
+      # APPLICATION ALERTS
+      # ============================================
+      - name: application-alerts
+        rules:
+          - alert: HighErrorRate
+            expr: sum(rate(http_errors_total[5m])) by (job) / sum(rate(http_requests_total[5m])) by (job) * 100 > 5
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High error rate in {{ $labels.job }}"
+              description: "Error rate is {{ $value | printf \"%.1f\" }}% (threshold: 5%)"
+
+          - alert: CriticalErrorRate
+            expr: sum(rate(http_errors_total[5m])) by (job) / sum(rate(http_requests_total[5m])) by (job) * 100 > 10
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Critical error rate in {{ $labels.job }}"
+              description: "Error rate is {{ $value | printf \"%.1f\" }}% (threshold: 10%)"
+
+          - alert: HighResponseTime
+            expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (job, le)) > 2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High response time in {{ $labels.job }}"
+              description: "P95 response time is {{ $value | printf \"%.2f\" }}s (threshold: 2s)"
+
+          - alert: ServiceDown
+            expr: up{job=~"nodejs-catalog|python-orders|go-inventory"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Service {{ $labels.job }} is down"
+              description: "Service has been unreachable for more than 1 minute"
+
+          - alert: NoRequests
+            expr: sum(rate(http_requests_total[5m])) by (job) == 0
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "No requests to {{ $labels.job }}"
+              description: "Service has received no requests in the last 10 minutes"
+
+          - alert: High5xxRate
+            expr: sum(rate(http_requests_total{status_code=~"5.."}[5m])) by (job) / sum(rate(http_requests_total[5m])) by (job) * 100 > 1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High 5xx error rate in {{ $labels.job }}"
+              description: "5xx error rate is {{ $value | printf \"%.1f\" }}%"
+
+          - alert: High4xxRate
+            expr: sum(rate(http_requests_total{status_code=~"4.."}[5m])) by (job) / sum(rate(http_requests_total[5m])) by (job) * 100 > 20
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High 4xx error rate in {{ $labels.job }}"
+              description: "4xx error rate is {{ $value | printf \"%.1f\" }}%"
+
+      # ============================================
+      # SLA & CRITICAL SERVICE ALERTS
+      # ============================================
+      - name: sla-alerts
+        rules:
+          - alert: ServiceCompletelyDown
+            expr: |
+              sum(up{job=~"nodejs-catalog|python-orders|go-inventory"}) by (job) == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "🚨 SERVICE DOWN: {{ $labels.job }} has no running pods"
+              description: "All pods for {{ $labels.job }} are down. Immediate action required!"
+
+          - alert: AllPodsDownNodejs
+            expr: sum(kube_pod_status_ready{namespace="ecommerce-poc", pod=~"nodejs-catalog.*"}) == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "🚨 ALL PODS DOWN: nodejs-catalog"
+              description: "All nodejs-catalog pods are down in ecommerce-poc namespace"
+
+          - alert: AllPodsDownPython
+            expr: sum(kube_pod_status_ready{namespace="ecommerce-poc", pod=~"python-orders.*"}) == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "🚨 ALL PODS DOWN: python-orders"
+              description: "All python-orders pods are down in ecommerce-poc namespace"
+
+          - alert: AllPodsDownGo
+            expr: sum(kube_pod_status_ready{namespace="ecommerce-poc", pod=~"go-inventory.*"}) == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "🚨 ALL PODS DOWN: go-inventory"
+              description: "All go-inventory pods are down in ecommerce-poc namespace"
+
+          - alert: High5xxErrorsIn5Min
+            expr: sum(increase(http_requests_total{status_code=~"5.."}[5m])) by (job) > 5
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "🔴 5XX SPIKE: {{ $labels.job }} has {{ $value | printf \"%.0f\" }} errors in 5 min"
+              description: "{{ $labels.job }} has more than 5 server errors (5xx) in the last 5 minutes"
+
+          - alert: High5xxErrorsIn5MinTotal
+            expr: sum(increase(http_requests_total{status_code=~"5.."}[5m])) > 10
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "🔴 5XX SPIKE: {{ $value | printf \"%.0f\" }} total 5xx errors in 5 min"
+              description: "More than 10 server errors (5xx) across all services in the last 5 minutes"
+
+      # ============================================
+      # MONITORING STACK ALERTS
+      # ============================================
+      - name: monitoring-alerts
+        rules:
+          - alert: PrometheusDown
+            expr: up{job="prometheus"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Prometheus is down"
+              description: "Prometheus has been unreachable for more than 1 minute"
+
+          - alert: PrometheusStorageAlmostFull
+            expr: (prometheus_tsdb_storage_blocks_bytes / (30 * 1024 * 1024 * 1024)) * 100 > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Prometheus storage almost full"
+              description: "Prometheus storage is {{ $value | printf \"%.1f\" }}% full"
+
+          - alert: AlertmanagerDown
+            expr: up{job="alertmanager"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Alertmanager is down"
+              description: "Alertmanager has been unreachable for more than 1 minute"
+
+          - alert: GrafanaDown
+            expr: up{job="grafana"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Grafana is down"
+              description: "Grafana has been unreachable for more than 1 minute"

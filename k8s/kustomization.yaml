@@ -17,6 +17,10 @@ resources:
   # Monitoring stack
   - prometheus/prometheus-deployment.yaml
   - prometheus/kube-state-metrics.yaml
+  - prometheus/node-exporter.yaml
+  - prometheus/alertmanager.yaml
+  - prometheus/alert-rules.yaml
   - grafana/grafana-deployment.yaml
   - loki/loki-deployment.yaml
+  - loki/promtail-daemonset.yaml
   - tempo/tempo-deployment.yaml

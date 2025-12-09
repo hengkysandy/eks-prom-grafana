@@ -1,0 +1,164 @@
+{
+  "dashboard": {
+    "title": "Application Logs & Traces",
+    "uid": "logs-traces",
+    "tags": ["logs", "traces", "loki", "tempo", "observability"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "refresh": "30s",
+    "templating": {
+      "list": [
+        {
+          "name": "namespace",
+          "type": "query",
+          "datasource": "Loki",
+          "query": "label_values(namespace)",
+          "refresh": 1,
+          "current": {"text": "ecommerce-poc", "value": "ecommerce-poc"}
+        },
+        {
+          "name": "container",
+          "type": "query",
+          "datasource": "Loki",
+          "query": "label_values({namespace=\"$namespace\"}, container)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "level",
+          "type": "custom",
+          "options": [
+            {"text": "All", "value": ""},
+            {"text": "Error", "value": "error"},
+            {"text": "Warning", "value": "warn"},
+            {"text": "Info", "value": "info"}
+          ],
+          "current": {"text": "All", "value": ""}
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Log Statistics",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Log Volume",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 1},
+        "datasource": "Loki",
+        "targets": [{"expr": "sum(count_over_time({namespace=\"$namespace\", container=~\"$container\"}[1m])) by (container)", "legendFormat": "{{container}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 30, "stacking": {"mode": "normal"}}}}
+      },
+      {
+        "id": 3,
+        "title": "Error Log Volume",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 1},
+        "datasource": "Loki",
+        "targets": [{"expr": "sum(count_over_time({namespace=\"$namespace\", container=~\"$container\"} |~ \"(?i)error|exception|fail\"[1m])) by (container)", "legendFormat": "{{container}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "fixed", "fixedColor": "red"}, "custom": {"fillOpacity": 30}}}
+      },
+      {
+        "id": 4,
+        "title": "Errors by Container (1h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 7},
+        "datasource": "Loki",
+        "targets": [{"expr": "sum(count_over_time({namespace=\"$namespace\", container=\"nodejs-catalog\"} |~ \"(?i)error\"[1h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "nodejs-catalog", "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 10, "color": "yellow"}, {"value": 50, "color": "red"}]}}}
+      },
+      {
+        "id": 5,
+        "title": "Errors by Container (1h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 7},
+        "datasource": "Loki",
+        "targets": [{"expr": "sum(count_over_time({namespace=\"$namespace\", container=\"python-orders\"} |~ \"(?i)error\"[1h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "python-orders", "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 10, "color": "yellow"}, {"value": 50, "color": "red"}]}}}
+      },
+      {
+        "id": 6,
+        "title": "Errors by Container (1h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 7},
+        "datasource": "Loki",
+        "targets": [{"expr": "sum(count_over_time({namespace=\"$namespace\", container=\"go-inventory\"} |~ \"(?i)error\"[1h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "go-inventory", "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 10, "color": "yellow"}, {"value": 50, "color": "red"}]}}}
+      },
+      {
+        "id": 7,
+        "title": "Total Logs (1h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 7},
+        "datasource": "Loki",
+        "targets": [{"expr": "sum(count_over_time({namespace=\"$namespace\"}[1h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": null, "color": "blue"}]}}}
+      },
+      {
+        "id": 8,
+        "title": "Application Logs",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 11}
+      },
+      {
+        "id": 9,
+        "title": "All Application Logs",
+        "type": "logs",
+        "gridPos": {"h": 12, "w": 24, "x": 0, "y": 12},
+        "datasource": "Loki",
+        "targets": [{"expr": "{namespace=\"$namespace\", container=~\"$container\"} |~ \"$level\"", "refId": "A"}],
+        "options": {"showTime": true, "showLabels": true, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"}
+      },
+      {
+        "id": 10,
+        "title": "Error Logs",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 24}
+      },
+      {
+        "id": 11,
+        "title": "Error & Exception Logs",
+        "type": "logs",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 25},
+        "datasource": "Loki",
+        "targets": [{"expr": "{namespace=\"$namespace\", container=~\"$container\"} |~ \"(?i)error|exception|fail|panic|fatal\"", "refId": "A"}],
+        "options": {"showTime": true, "showLabels": true, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"}
+      },
+      {
+        "id": 12,
+        "title": "Distributed Traces",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35}
+      },
+      {
+        "id": 13,
+        "title": "Recent Traces",
+        "type": "traces",
+        "gridPos": {"h": 12, "w": 24, "x": 0, "y": 36},
+        "datasource": "Tempo",
+        "targets": [{"queryType": "search", "serviceName": "", "limit": 20, "refId": "A"}]
+      },
+      {
+        "id": 14,
+        "title": "Trace Search",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 48}
+      },
+      {
+        "id": 15,
+        "title": "Search Traces by Service",
+        "description": "Use TraceQL: { service.name=\"nodejs-catalog\" }",
+        "type": "traces",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 49},
+        "datasource": "Tempo",
+        "targets": [{"queryType": "traceql", "query": "{ status=error }", "limit": 20, "refId": "A"}]
+      }
+    ]
+  },
+  "overwrite": true
+}

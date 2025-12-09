@@ -4,8 +4,30 @@ import time
 import logging
 import json
 import sys
+import os
+
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.semconv.resource import ResourceAttributes
+
+# Initialize tracing
+resource = Resource(attributes={
+    ResourceAttributes.SERVICE_NAME: "python-orders"
+})
+trace.set_tracer_provider(TracerProvider(resource=resource))
+otlp_exporter = OTLPSpanExporter(
+    endpoint=os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://tempo.monitoring.svc.cluster.local:4318/v1/traces')
+)
+trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(otlp_exporter))
 
 app = Flask(__name__)
+
+# Instrument Flask app
+FlaskInstrumentor().instrument_app(app)
 
 # Configure JSON logging
 class JsonFormatter(logging.Formatter):

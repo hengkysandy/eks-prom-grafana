@@ -1,0 +1,175 @@
+{
+  "dashboard": {
+    "title": "Kubernetes Components Health",
+    "uid": "k8s-health",
+    "tags": ["kubernetes", "health", "components"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cluster Components Status",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Node Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 1},
+        "targets": [{"expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "Nodes Ready", "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 1, "color": "green"}]}}}
+      },
+      {
+        "id": 3,
+        "title": "Deployments",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 4, "y": 1},
+        "targets": [{"expr": "sum(kube_deployment_status_replicas_available) / sum(kube_deployment_spec_replicas) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "displayName": "Deployment Health", "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 80, "color": "yellow"}, {"value": 100, "color": "green"}]}}}
+      },
+      {
+        "id": 4,
+        "title": "DaemonSets",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 1},
+        "targets": [{"expr": "sum(kube_daemonset_status_number_ready) / sum(kube_daemonset_status_desired_number_scheduled) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "displayName": "DaemonSet Health", "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 80, "color": "yellow"}, {"value": 100, "color": "green"}]}}}
+      },
+      {
+        "id": 5,
+        "title": "Prometheus",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 12, "y": 1},
+        "targets": [{"expr": "up{job=\"prometheus\"}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "Prometheus", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+      },
+      {
+        "id": 6,
+        "title": "Alertmanager",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 1},
+        "targets": [{"expr": "up{job=\"alertmanager\"}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "Alertmanager", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+      },
+      {
+        "id": 7,
+        "title": "Grafana",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 1},
+        "targets": [{"expr": "up{job=\"grafana\"}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "Grafana", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+      },
+      {
+        "id": 8,
+        "title": "Application Services",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}
+      },
+      {
+        "id": 9,
+        "title": "nodejs-catalog",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 0, "y": 6},
+        "targets": [{"expr": "up{job=\"nodejs-catalog\"}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "Node.js Catalog", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+      },
+      {
+        "id": 10,
+        "title": "python-orders",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 8, "y": 6},
+        "targets": [{"expr": "up{job=\"python-orders\"}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "Python Orders", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+      },
+      {
+        "id": 11,
+        "title": "go-inventory",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 16, "y": 6},
+        "targets": [{"expr": "up{job=\"go-inventory\"}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"displayName": "Go Inventory", "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+      },
+      {
+        "id": 12,
+        "title": "Workload Details",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 10}
+      },
+      {
+        "id": 13,
+        "title": "Deployment Status",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 11},
+        "targets": [
+          {"expr": "kube_deployment_spec_replicas", "format": "table", "instant": true, "refId": "A"},
+          {"expr": "kube_deployment_status_replicas_available", "format": "table", "instant": true, "refId": "B"},
+          {"expr": "kube_deployment_status_replicas_unavailable", "format": "table", "instant": true, "refId": "C"}
+        ],
+        "transformations": [
+          {"id": "merge"},
+          {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true, "job": true, "instance": true}, "renameByName": {"namespace": "Namespace", "deployment": "Deployment", "Value #A": "Desired", "Value #B": "Available", "Value #C": "Unavailable"}}}
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Pod Status by Namespace",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 11},
+        "targets": [{"expr": "sum(kube_pod_status_phase) by (namespace, phase)", "format": "table", "instant": true, "refId": "A"}],
+        "transformations": [
+          {"id": "organize", "options": {"excludeByName": {"Time": true}, "renameByName": {"namespace": "Namespace", "phase": "Phase", "Value": "Count"}}}
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Resource Quotas",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 19}
+      },
+      {
+        "id": 16,
+        "title": "CPU Allocatable vs Requested",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "targets": [
+          {"expr": "sum(kube_node_status_allocatable{resource=\"cpu\"})", "legendFormat": "Allocatable", "refId": "A"},
+          {"expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"})", "legendFormat": "Requested", "refId": "B"},
+          {"expr": "sum(kube_pod_container_resource_limits{resource=\"cpu\"})", "legendFormat": "Limits", "refId": "C"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "short"}}
+      },
+      {
+        "id": 17,
+        "title": "Memory Allocatable vs Requested",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "targets": [
+          {"expr": "sum(kube_node_status_allocatable{resource=\"memory\"})", "legendFormat": "Allocatable", "refId": "A"},
+          {"expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"})", "legendFormat": "Requested", "refId": "B"},
+          {"expr": "sum(kube_pod_container_resource_limits{resource=\"memory\"})", "legendFormat": "Limits", "refId": "C"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "bytes"}}
+      },
+      {
+        "id": 18,
+        "title": "Alerts",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28}
+      },
+      {
+        "id": 19,
+        "title": "Active Alerts",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 29},
+        "targets": [{"expr": "ALERTS{alertstate=\"firing\"}", "format": "table", "instant": true, "refId": "A"}],
+        "transformations": [
+          {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true, "alertstate": true}, "renameByName": {"alertname": "Alert", "severity": "Severity", "namespace": "Namespace", "pod": "Pod", "job": "Job"}}}
+        ],
+        "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "Severity"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "basic"}}, {"id": "mappings", "value": [{"type": "value", "options": {"critical": {"color": "red"}, "warning": {"color": "yellow"}}}]}]}]}
+      }
+    ]
+  },
+  "overwrite": true
+}

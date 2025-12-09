@@ -1,0 +1,197 @@
+{
+  "dashboard": {
+    "title": "Application Performance & HTTP Metrics",
+    "uid": "app-performance",
+    "tags": ["application", "http", "performance", "sre"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "refresh": "30s",
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(http_requests_total, job)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "SLI Overview",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Success Rate (2xx)",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 0, "y": 1},
+        "targets": [{"expr": "sum(rate(http_requests_total{job=~\"$service\", status_code=~\"2..\"}[5m])) / sum(rate(http_requests_total{job=~\"$service\"}[5m])) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "thresholds": {"steps": [{"value": null, "color": "red"}, {"value": 95, "color": "yellow"}, {"value": 99, "color": "green"}]}}}
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 4, "y": 1},
+        "targets": [{"expr": "sum(rate(http_errors_total{job=~\"$service\"}[5m])) / sum(rate(http_requests_total{job=~\"$service\"}[5m])) * 100", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 1, "color": "yellow"}, {"value": 5, "color": "red"}]}}}
+      },
+      {
+        "id": 4,
+        "title": "Total Requests (1h)",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 8, "y": 1},
+        "targets": [{"expr": "sum(increase(http_requests_total{job=~\"$service\"}[1h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [{"value": null, "color": "blue"}]}}}
+      },
+      {
+        "id": 5,
+        "title": "Total Errors (1h)",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 12, "y": 1},
+        "targets": [{"expr": "sum(increase(http_errors_total{job=~\"$service\"}[1h]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 10, "color": "yellow"}, {"value": 100, "color": "red"}]}}}
+      },
+      {
+        "id": 6,
+        "title": "P95 Latency",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 16, "y": 1},
+        "targets": [{"expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "s", "decimals": 3, "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 0.5, "color": "yellow"}, {"value": 1, "color": "red"}]}}}
+      },
+      {
+        "id": 7,
+        "title": "Request Rate",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 20, "y": 1},
+        "targets": [{"expr": "sum(rate(http_requests_total{job=~\"$service\"}[5m]))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "reqps", "decimals": 2, "thresholds": {"steps": [{"value": null, "color": "blue"}]}}}
+      },
+      {
+        "id": 8,
+        "title": "HTTP Status Codes",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6}
+      },
+      {
+        "id": 9,
+        "title": "2XX Success Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 7},
+        "targets": [{"expr": "sum(rate(http_requests_total{job=~\"$service\", status_code=~\"2..\"}[5m])) by (job)", "legendFormat": "{{job}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"fillOpacity": 20}, "color": {"mode": "fixed", "fixedColor": "green"}}}
+      },
+      {
+        "id": 10,
+        "title": "4XX Client Errors",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 7},
+        "targets": [{"expr": "sum(rate(http_requests_total{job=~\"$service\", status_code=~\"4..\"}[5m])) by (job)", "legendFormat": "{{job}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"fillOpacity": 20}, "color": {"mode": "fixed", "fixedColor": "yellow"}}}
+      },
+      {
+        "id": 11,
+        "title": "5XX Server Errors",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 7},
+        "targets": [{"expr": "sum(rate(http_requests_total{job=~\"$service\", status_code=~\"5..\"}[5m])) by (job)", "legendFormat": "{{job}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"fillOpacity": 20}, "color": {"mode": "fixed", "fixedColor": "red"}}}
+      },
+      {
+        "id": 12,
+        "title": "HTTP Status Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 15},
+        "targets": [{"expr": "sum(increase(http_requests_total{job=~\"$service\"}[1h])) by (status_code)", "legendFormat": "{{status_code}}", "refId": "A"}],
+        "options": {"legend": {"displayMode": "table", "placement": "right"}}
+      },
+      {
+        "id": 13,
+        "title": "Errors by Type",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 15},
+        "targets": [{"expr": "sum(increase(http_errors_total{job=~\"$service\"}[1h])) by (error_type)", "legendFormat": "{{error_type}}", "refId": "A"}],
+        "options": {"legend": {"displayMode": "table", "placement": "right"}}
+      },
+      {
+        "id": 14,
+        "title": "Errors by Service",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 15},
+        "targets": [{"expr": "sum(increase(http_errors_total[1h])) by (job)", "legendFormat": "{{job}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 10, "color": "yellow"}, {"value": 50, "color": "red"}]}}}
+      },
+      {
+        "id": 15,
+        "title": "Latency Analysis",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 23}
+      },
+      {
+        "id": 16,
+        "title": "P50 / P95 / P99 Latency",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {"expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) by (job, le))", "legendFormat": "{{job}} - P50", "refId": "A"},
+          {"expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) by (job, le))", "legendFormat": "{{job}} - P95", "refId": "B"},
+          {"expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) by (job, le))", "legendFormat": "{{job}} - P99", "refId": "C"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "s"}}
+      },
+      {
+        "id": 17,
+        "title": "P98 by HTTP Method",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {"expr": "histogram_quantile(0.98, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\", method=\"GET\"}[5m])) by (le))", "legendFormat": "GET", "refId": "A"},
+          {"expr": "histogram_quantile(0.98, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\", method=\"POST\"}[5m])) by (le))", "legendFormat": "POST", "refId": "B"},
+          {"expr": "histogram_quantile(0.98, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\", method=\"PUT\"}[5m])) by (le))", "legendFormat": "PUT", "refId": "C"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "s"}}
+      },
+      {
+        "id": 18,
+        "title": "Slowest Endpoints (P98)",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+        "targets": [{"expr": "topk(10, histogram_quantile(0.98, sum(rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) by (job, route, method, le)))", "format": "table", "instant": true, "refId": "A"}],
+        "transformations": [
+          {"id": "organize", "options": {"excludeByName": {"Time": true, "le": true}, "renameByName": {"job": "Service", "route": "Endpoint", "method": "Method", "Value": "P98 Latency (s)"}}}
+        ],
+        "fieldConfig": {"defaults": {"unit": "s"}, "overrides": [{"matcher": {"id": "byName", "options": "P98 Latency (s)"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "gradient"}}]}]}
+      },
+      {
+        "id": 19,
+        "title": "Service Health",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 40}
+      },
+      {
+        "id": 20,
+        "title": "Service CPU Usage",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 41},
+        "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"ecommerce-poc\", container!=\"\"}[5m])) by (container)", "legendFormat": "{{container}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "short"}}
+      },
+      {
+        "id": 21,
+        "title": "Service Memory Usage",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 41},
+        "targets": [{"expr": "sum(container_memory_working_set_bytes{namespace=\"ecommerce-poc\", container!=\"\"}) by (container)", "legendFormat": "{{container}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "bytes"}}
+      }
+    ]
+  },
+  "overwrite": true
+}

@@ -31,3 +31,17 @@ Thumbs.db
 secrets.yaml
 *.pem
 *.key
+
+# Large binary files
+poc-kiro-*
+
+# Node modules
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Go
+vendor/
